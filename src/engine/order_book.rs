@@ -1,5 +1,3 @@
-// src/engine/order_book.rs
-
 use ordered_float::OrderedFloat;
 
 use crate::types::{OrderRequest, OrderSide, TradeReport};
