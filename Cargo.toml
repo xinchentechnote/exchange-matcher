@@ -7,3 +7,4 @@ edition = "2024"
 chrono = "0.4.41"
 crossbeam-channel = "0.5.15"
 ordered-float = "5.0.0"
+sse-binary = { git = "https://github.com/xinchentechnote/fin-proto-rs", tag = "v0.2.0" }
