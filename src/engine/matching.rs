@@ -11,6 +11,10 @@ pub struct AutoMatchingEngine {
 }
 
 impl AutoMatchingEngine {
+    pub fn get_order_sender(&self) -> Sender<OrderRequest> {
+        self.order_sender.clone()
+    }
+
     pub fn new(order_book: Arc<Mutex<OrderBook>>) -> Self {
         let (tx, rx): (Sender<OrderRequest>, Receiver<OrderRequest>) = unbounded();
 
