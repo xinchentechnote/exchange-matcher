@@ -10,3 +10,5 @@ crossbeam-channel = "0.5.15"
 ordered-float = "5.0.0"
 sse-binary = { git = "https://github.com/xinchentechnote/fin-proto-rs", tag = "v0.2.0" }
 binary-codec = { git = "https://github.com/xinchentechnote/fin-proto-rs", tag = "v0.2.0" }
+anyhow = "1.0.98"
+tokio = {version = "1.47.1",features = ["full"]}
