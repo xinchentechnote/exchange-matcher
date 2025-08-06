@@ -1,0 +1,15 @@
+# [[simulators]]
+# name = "sse_bin_tgw_1"
+# type = "tgw"
+# communication = "tcp"
+# protocol = "binary-sse"
+# listen_address = ":9002"
+# auto_start = true
+
+[[simulators]]
+name = "sse_bin_oms_1"
+type = "oms"
+communication = "tcp"
+protocol = "binary-sse"
+server_address = "localhost:9010"
+auto_start = false
