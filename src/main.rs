@@ -41,14 +41,7 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(msg) = decoder.next_frame() {
                     match msg.body {
                         SseBinaryBodyEnum::NewOrderSingle(order) => {
-                            let order_request = OrderRequest {
-                                id: order.cl_ord_id.clone(),
-                                symbol: order.security_id.clone(),
-                                side: OrderSide::Buy,
-                                price: ordered_float::OrderedFloat(order.price as f64),
-                                qty: order.order_qty as u64,
-                                source: "manual".to_string(),
-                            };
+                            let order_request = order.clone().into();
                             println!("order: {:?}", order);
                             let _ = order_tx.send(order_request);
                         }
