@@ -17,8 +17,8 @@ pub struct OrderRequest {
     pub source: String,
 }
 
-impl From<NewOrderSingle> for OrderRequest {
-    fn from(order: NewOrderSingle) -> Self {
+impl From<&NewOrderSingle> for OrderRequest {
+    fn from(order: &NewOrderSingle) -> Self {
         OrderRequest {
             id: order.cl_ord_id.clone(),
             symbol: order.security_id.clone(),
@@ -63,7 +63,7 @@ mod tests {
             branch_id: "test".to_string(),
             user_info: "xxx".to_string(),
         };
-        let order_request = OrderRequest::from(order);
+        let order_request = OrderRequest::from(&order);
         assert_eq!(order_request.id, "123");
     }
 }
