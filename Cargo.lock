@@ -62,7 +62,7 @@ dependencies = [
 [[package]]
 name = "binary-codec"
 version = "0.1.0"
-source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.2.0#17e7b7f40eb4cbfba89f18dc430ef845351a0973"
+source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.3.0#e187f4e0eaff0c87b4765139cebf3dc515ac772f"
 dependencies = [
  "binary-codec-macro",
  "bytes",
@@ -73,7 +73,7 @@ dependencies = [
 [[package]]
 name = "binary-codec-macro"
 version = "0.1.0"
-source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.2.0#17e7b7f40eb4cbfba89f18dc430ef845351a0973"
+source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.3.0#e187f4e0eaff0c87b4765139cebf3dc515ac772f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -91,6 +91,12 @@ name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
+
+[[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
@@ -423,9 +429,10 @@ dependencies = [
 [[package]]
 name = "sse-binary"
 version = "0.1.0"
-source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.2.0#17e7b7f40eb4cbfba89f18dc430ef845351a0973"
+source = "git+https://github.com/xinchentechnote/fin-proto-rs?tag=v0.3.0#e187f4e0eaff0c87b4765139cebf3dc515ac772f"
 dependencies = [
  "binary-codec",
+ "byteorder",
  "bytes",
 ]
 

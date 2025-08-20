@@ -19,10 +19,14 @@ pub struct OrderRequest {
 
 impl From<&NewOrderSingle> for OrderRequest {
     fn from(order: &NewOrderSingle) -> Self {
+        let side = match order.side.as_str() {
+            "1" => OrderSide::Buy,
+            _ => OrderSide::Sell,
+        };
         OrderRequest {
             id: order.cl_ord_id.clone(),
             symbol: order.security_id.clone(),
-            side: OrderSide::Buy,
+            side: side,
             price: ordered_float::OrderedFloat(order.price as f64),
             qty: order.order_qty as u64,
             source: "manual".to_string(),

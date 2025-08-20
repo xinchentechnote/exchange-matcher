@@ -6,6 +6,8 @@ use std::time::Duration;
 use crate::engine::order_book::OrderBook;
 use crate::types::OrderRequest;
 
+pub trait MatchingEngine {}
+
 pub struct AutoMatchingEngine {
     order_sender: Sender<OrderRequest>,
 }
