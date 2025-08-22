@@ -4,21 +4,21 @@ use std::thread;
 use std::time::Duration;
 
 use crate::engine::order_book::OrderBook;
-use crate::types::OrderRequest;
+use crate::types::Order;
 
 pub trait MatchingEngine {}
 
 pub struct AutoMatchingEngine {
-    order_sender: Sender<OrderRequest>,
+    order_sender: Sender<Order>,
 }
 
 impl AutoMatchingEngine {
-    pub fn get_order_sender(&self) -> Sender<OrderRequest> {
+    pub fn get_order_sender(&self) -> Sender<Order> {
         self.order_sender.clone()
     }
 
     pub fn new(order_book: Arc<Mutex<OrderBook>>) -> Self {
-        let (tx, rx): (Sender<OrderRequest>, Receiver<OrderRequest>) = unbounded();
+        let (tx, rx): (Sender<Order>, Receiver<Order>) = unbounded();
 
         // 撮合线程
         let order_book_clone = Arc::clone(&order_book);
@@ -39,15 +39,17 @@ impl AutoMatchingEngine {
         Self { order_sender: tx }
     }
 
-    pub fn submit_order(&self, order: OrderRequest) {
+    pub fn submit_order(&self, order: Order) {
         let _ = self.order_sender.send(order);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
-    use crate::types::{OrderRequest, OrderSide};
+    use crate::types::{Order, OrderSide};
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
@@ -61,27 +63,33 @@ mod tests {
         let engine = AutoMatchingEngine::new(order_book.clone());
 
         // 提交一个买单
-        engine.submit_order(OrderRequest {
-            id: "1".to_string(),
+        engine.submit_order(Order {
+            order_id: "9527".to_string(),
             side: OrderSide::Buy,
-            price: ordered_float::OrderedFloat(100.0),
+            price: 100,
             qty: 10,
-            symbol: "BTCUSDT".to_string(),
-            source: "test".to_string(),
+            security_id: "000001".to_string(),
+            member_id: 9527,
+            uid: 9527,
+            traded_qty: 0,
+            timestamp: Utc::now().timestamp_millis(),
         });
 
         // 提交一个卖单
-        engine.submit_order(OrderRequest {
-            id: "2".to_string(),
+        engine.submit_order(Order {
+            order_id: "9528".to_string(),
             side: OrderSide::Sell,
-            price: ordered_float::OrderedFloat(100.0),
+            price: 100,
             qty: 10,
-            symbol: "BTCUSDT".to_string(),
-            source: "test".to_string(),
+            security_id: "000001".to_string(),
+            member_id: 9527,
+            uid: 9527,
+            traded_qty: 0,
+            timestamp: Utc::now().timestamp_millis(),
         });
 
         // 等待撮合线程运行
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(1000));
 
         // 验证订单薄应为空
         let book = order_book.lock().unwrap();

@@ -1,6 +1,9 @@
 use binary_codec::BinaryCodec;
 use bytes::{Buf, Bytes, BytesMut};
-use sse_binary::sse_binary::SseBinary;
+use chrono::Utc;
+use sse_binary::{new_order_single::NewOrderSingle, report::Report, sse_binary::SseBinary};
+
+use crate::types::{MatchResult, Order, OrderSide};
 
 pub trait ProtocolDecoder: Send + Sync {
     type Message;
@@ -59,5 +62,90 @@ impl<D: ProtocolDecoder> FrameDecoder<D> {
         // 5. 解码
         let mut msg_buf = msg_bytes.clone();
         self.decoder.decode(&mut msg_buf)
+    }
+}
+
+impl From<&NewOrderSingle> for Order {
+    fn from(order: &NewOrderSingle) -> Self {
+        let side = match order.side.as_str() {
+            "1" => OrderSide::Buy,
+            _ => OrderSide::Sell,
+        };
+        Order {
+            order_id: order.cl_ord_id.clone(),
+            security_id: order.security_id.clone(),
+            side: side,
+            price: order.price as u64,
+            qty: order.order_qty as u64,
+            member_id: 0,
+            uid: 0,
+            traded_qty: 0,
+            timestamp: Utc::now().timestamp_millis(),
+        }
+    }
+}
+
+impl From<&MatchResult> for Report {
+    fn from(value: &MatchResult) -> Self {
+        Report {
+            pbu: todo!(),
+            set_id: todo!(),
+            report_index: todo!(),
+            biz_id: todo!(),
+            exec_type: todo!(),
+            biz_pbu: todo!(),
+            cl_ord_id: value.order_id.clone(),
+            security_id: "".to_string(),
+            account: todo!(),
+            owner_type: todo!(),
+            side: todo!(),
+            price: value.price as i64,
+            order_qty: value.qty as i64,
+            leaves_qty: 0,
+            cxl_qty: todo!(),
+            ord_type: todo!(),
+            time_in_force: todo!(),
+            ord_status: todo!(),
+            credit_tag: todo!(),
+            orig_cl_ord_id: todo!(),
+            clearing_firm: todo!(),
+            branch_id: todo!(),
+            ord_rej_reason: todo!(),
+            ord_cnfm_id: todo!(),
+            orig_ord_cnfm_id: todo!(),
+            trade_date: todo!(),
+            transact_time: todo!(),
+            user_info: todo!(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sse_binary::new_order_single::NewOrderSingle;
+
+    use super::*;
+    #[test]
+    fn test_order_request_from_new_order_single() {
+        let order = NewOrderSingle {
+            cl_ord_id: "123".to_string(),
+            security_id: "AAPL".to_string(),
+            side: "BUY".to_string(),
+            price: 1000,
+            order_qty: 100,
+            biz_id: 10,
+            biz_pbu: "123".to_string(),
+            account: "123".to_string(),
+            owner_type: 1,
+            ord_type: "2".to_string(),
+            time_in_force: "3".to_string(),
+            transact_time: 20250101,
+            credit_tag: "3".to_string(),
+            clearing_firm: "3".to_string(),
+            branch_id: "test".to_string(),
+            user_info: "xxx".to_string(),
+        };
+        let order_request = Order::from(&order);
+        assert_eq!(order_request.order_id, "123");
     }
 }

@@ -1,12 +1,10 @@
-use ordered_float::OrderedFloat;
-
-use crate::types::{OrderRequest, OrderSide, TradeReport};
+use crate::types::{MatchResult, Order, OrderSide};
 use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Default)]
 pub struct OrderBook {
-    pub bids: BTreeMap<OrderedFloat<f64>, VecDeque<OrderRequest>>, // price descending
-    pub asks: BTreeMap<OrderedFloat<f64>, VecDeque<OrderRequest>>, // price ascending
+    pub bids: BTreeMap<u64, VecDeque<Order>>, // price descending
+    pub asks: BTreeMap<u64, VecDeque<Order>>, // price ascending
 }
 
 impl OrderBook {
@@ -17,7 +15,7 @@ impl OrderBook {
         }
     }
 
-    pub fn insert(&mut self, order: OrderRequest) {
+    pub fn insert(&mut self, order: Order) {
         let book = match order.side {
             OrderSide::Buy => &mut self.bids,
             OrderSide::Sell => &mut self.asks,
@@ -27,19 +25,19 @@ impl OrderBook {
             .push_back(order);
     }
 
-    pub fn match_order(&mut self, mut taker: OrderRequest) -> Vec<TradeReport> {
+    pub fn match_order(&mut self, mut taker: Order) -> Vec<MatchResult> {
         let mut trades = Vec::new();
         let book = match taker.side {
             OrderSide::Buy => &mut self.asks,
             OrderSide::Sell => &mut self.bids,
         };
 
-        let price_match = |book_price: OrderedFloat<f64>| match taker.side {
+        let price_match = |book_price: u64| match taker.side {
             OrderSide::Buy => taker.price >= book_price,
             OrderSide::Sell => taker.price <= book_price,
         };
 
-        let mut matched_prices: Vec<OrderedFloat<f64>> = book
+        let mut matched_prices: Vec<u64> = book
             .keys()
             .cloned()
             .filter(|&price| price_match(price))
@@ -56,13 +54,14 @@ impl OrderBook {
             while let Some(maker) = queue.front_mut() {
                 let traded_qty = taker.qty.min(maker.qty);
 
-                trades.push(TradeReport {
-                    order_id: taker.id.clone(),
-                    counter_order_id: maker.id.clone(),
-                    symbol: taker.symbol.clone(),
+                trades.push(MatchResult {
+                    order_id: taker.order_id.clone(),
                     price,
                     qty: traded_qty,
-                    trade_time: chrono::Utc::now().timestamp_millis() as u64,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                    member_id: taker.member_id,
+                    //TODO
+                    order_status: 1,
                 });
 
                 taker.qty -= traded_qty;
@@ -96,17 +95,22 @@ impl OrderBook {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
     use crate::types::*;
 
-    fn make_order(id: &str, side: OrderSide, price: OrderedFloat<f64>, qty: u64) -> OrderRequest {
-        OrderRequest {
-            id: id.to_string(),
-            symbol: "BTCUSDT".to_string(),
-            side,
-            price,
-            qty,
-            source: "test".to_string(),
+    fn make_order(order_id: &str, side: OrderSide, price: u64, qty: u64) -> Order {
+        Order {
+            order_id: order_id.to_string(),
+            side: side,
+            price: price,
+            qty: qty,
+            security_id: "000001".to_string(),
+            member_id: 9527,
+            uid: 9527,
+            traded_qty: 0,
+            timestamp: Utc::now().timestamp_millis(),
         }
     }
 
@@ -114,14 +118,14 @@ mod tests {
     fn test_exact_match() {
         let mut book = OrderBook::new();
 
-        let maker = make_order("1", OrderSide::Sell, OrderedFloat(100.0), 10);
+        let maker = make_order("1", OrderSide::Sell, 100, 10);
         book.insert(maker);
 
-        let taker = make_order("2", OrderSide::Buy, OrderedFloat(100.0), 10);
+        let taker = make_order("2", OrderSide::Buy, 100, 10);
         let trades = book.match_order(taker);
 
         assert_eq!(trades.len(), 1);
-        assert_eq!(trades[0].price, 100.0);
+        assert_eq!(trades[0].price, 100);
         assert_eq!(trades[0].qty, 10);
         assert!(book.asks.is_empty());
     }
@@ -130,10 +134,10 @@ mod tests {
     fn test_partial_match() {
         let mut book = OrderBook::new();
 
-        let maker = make_order("1", OrderSide::Sell, OrderedFloat(100.0), 5);
+        let maker = make_order("1", OrderSide::Sell, 100, 5);
         book.insert(maker);
 
-        let taker = make_order("2", OrderSide::Buy, OrderedFloat(100.0), 10);
+        let taker = make_order("2", OrderSide::Buy, 100, 10);
         let trades = book.match_order(taker);
 
         assert_eq!(trades.len(), 1);
@@ -145,10 +149,10 @@ mod tests {
     fn test_no_match() {
         let mut book = OrderBook::new();
 
-        let maker = make_order("1", OrderSide::Sell, OrderedFloat(101.0), 5);
+        let maker = make_order("1", OrderSide::Sell, 101, 5);
         book.insert(maker);
 
-        let taker = make_order("2", OrderSide::Buy, OrderedFloat(100.0), 5);
+        let taker = make_order("2", OrderSide::Buy, 100, 5);
         let trades = book.match_order(taker);
 
         assert!(trades.is_empty());

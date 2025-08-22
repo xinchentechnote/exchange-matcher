@@ -8,7 +8,7 @@ use tokio::net::TcpStream;
 
 use crate::protocol::proto::FrameDecoder;
 use crate::protocol::proto::SseDecoder;
-use crate::types::OrderRequest;
+use crate::types::Order;
 
 pub trait AcceptorChannel {
     async fn start(&mut self) -> Result<(), Error>;
@@ -17,14 +17,14 @@ pub trait AcceptorChannel {
 
 pub struct TcpAcceptorChannel {
     tcp_listener: Option<TcpListener>,
-    order_sender: Sender<OrderRequest>,
+    order_sender: Sender<Order>,
     decoder: Option<FrameDecoder<SseDecoder>>,
     port: u16,
     running: bool,
 }
 
 impl TcpAcceptorChannel {
-    pub fn new(port: u16, sender: Sender<OrderRequest>) -> Self {
+    pub fn new(port: u16, sender: Sender<Order>) -> Self {
         Self {
             tcp_listener: None,
             order_sender: sender,
@@ -63,10 +63,7 @@ impl AcceptorChannel for TcpAcceptorChannel {
 }
 
 impl TcpAcceptorChannel {
-    async fn run_acceptor(
-        listener: TcpListener,
-        sender: Sender<OrderRequest>,
-    ) -> Result<(), Error> {
+    async fn run_acceptor(listener: TcpListener, sender: Sender<Order>) -> Result<(), Error> {
         loop {
             let (mut stream, addr) = listener.accept().await?;
             println!("Accepted connection from {:?}", addr);
@@ -80,10 +77,7 @@ impl TcpAcceptorChannel {
         }
     }
 
-    async fn handle_connection(
-        mut stream: TcpStream,
-        sender: Sender<OrderRequest>,
-    ) -> Result<(), Error> {
+    async fn handle_connection(mut stream: TcpStream, sender: Sender<Order>) -> Result<(), Error> {
         let mut decoder = FrameDecoder::new(SseDecoder);
         let mut buffer = [0u8; 1024];
 
@@ -98,8 +92,14 @@ impl TcpAcceptorChannel {
 
             while let Some(msg) = decoder.next_frame() {
                 match msg.body {
+                    SseBinaryBodyEnum::Logon(logon) => {
+                        println!("Logon received: {:?}", logon);
+                    }
+                    SseBinaryBodyEnum::Heartbeat(_) => {
+                        println!("Heartbeat received");
+                    }
                     SseBinaryBodyEnum::NewOrderSingle(order) => {
-                        let order_request = OrderRequest::from(&order);
+                        let order_request = Order::from(&order);
                         println!("Order received: {:?}", order);
                         let _ = sender.send(order_request);
                     }
