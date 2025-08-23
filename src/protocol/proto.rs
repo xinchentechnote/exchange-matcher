@@ -3,7 +3,7 @@ use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use sse_binary::{new_order_single::NewOrderSingle, report::Report, sse_binary::SseBinary};
 
-use crate::types::{MatchResult, Order, OrderSide};
+use crate::types::{MatchEvent, Order, OrderSide};
 
 pub trait ProtocolDecoder: Send + Sync {
     type Message;
@@ -71,22 +71,23 @@ impl From<&NewOrderSingle> for Order {
             "1" => OrderSide::Buy,
             _ => OrderSide::Sell,
         };
+
         Order {
-            order_id: order.cl_ord_id.clone(),
+            oid: order.cl_ord_id.parse::<i64>().unwrap(),
             security_id: order.security_id.clone(),
             side: side,
-            price: order.price as u64,
-            qty: order.order_qty as u64,
-            member_id: 0,
+            price: order.price,
+            volume: order.order_qty,
+            mid: 0,
             uid: 0,
-            traded_qty: 0,
+            tvolume: 0,
             timestamp: Utc::now().timestamp_millis(),
         }
     }
 }
 
-impl From<&MatchResult> for Report {
-    fn from(value: &MatchResult) -> Self {
+impl From<&MatchEvent> for Report {
+    fn from(value: &MatchEvent) -> Self {
         Report {
             pbu: todo!(),
             set_id: todo!(),
@@ -94,13 +95,13 @@ impl From<&MatchResult> for Report {
             biz_id: todo!(),
             exec_type: todo!(),
             biz_pbu: todo!(),
-            cl_ord_id: value.order_id.clone(),
+            cl_ord_id: value.oid.to_string(),
             security_id: "".to_string(),
             account: todo!(),
             owner_type: todo!(),
             side: todo!(),
-            price: value.price as i64,
-            order_qty: value.qty as i64,
+            price: value.price,
+            order_qty: value.volume,
             leaves_qty: 0,
             cxl_qty: todo!(),
             ord_type: todo!(),
@@ -145,7 +146,7 @@ mod tests {
             branch_id: "test".to_string(),
             user_info: "xxx".to_string(),
         };
-        let order_request = Order::from(&order);
-        assert_eq!(order_request.order_id, "123");
+        let order = Order::from(&order);
+        assert_eq!(order.oid, 123);
     }
 }

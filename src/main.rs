@@ -1,24 +1,14 @@
-mod engine;
-mod interface;
-mod protocol;
-mod types;
+use exchange_matcher::engine::match_engine::MatchEngine;
 
-use std::sync::{Arc, Mutex};
-
-use engine::matching::AutoMatchingEngine;
-use engine::order_book::OrderBook;
-
-use crate::interface::channel::{AcceptorChannel, TcpAcceptorChannel};
+use exchange_matcher::interface::channel::{AcceptorChannel, TcpAcceptorChannel};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let order_book = Arc::new(Mutex::new(OrderBook::new()));
-    let engine = AutoMatchingEngine::new(order_book.clone());
-    let mut acceptor = TcpAcceptorChannel::new(9010, engine.get_order_sender());
+    let engine = MatchEngine::new();
+    let mut acceptor = TcpAcceptorChannel::new(9010, engine);
     acceptor.start().await?;
     tokio::signal::ctrl_c().await?;
     println!("Received shutdown signal, gracefully shutting down...");
-
     acceptor.stop().await?;
     Ok(())
 }
