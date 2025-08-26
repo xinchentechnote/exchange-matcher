@@ -1,13 +1,13 @@
 use sse_binary::sse_binary::SseBinaryBodyEnum;
 use std::io::Error;
 use std::io::ErrorKind;
-use std::sync::Arc;
+use std::sync::Weak;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
-use crate::engine::match_engine::MatchEngine;
+use crate::matcher_app::MatcherApp;
 use crate::protocol::proto::FrameDecoder;
 use crate::protocol::proto::SseDecoder;
 use crate::types::Order;
@@ -21,20 +21,23 @@ pub trait AcceptorChannel {
 pub struct TcpAcceptorChannel {
     tcp_listener: Option<TcpListener>,
     decoder: Option<FrameDecoder<SseDecoder>>,
-    engine: Arc<Mutex<MatchEngine>>,
+    app: Option<Weak<Mutex<dyn MatcherApp>>>,
     port: u16,
     running: bool,
 }
 
 impl TcpAcceptorChannel {
-    pub fn new(port: u16, engine: MatchEngine) -> Self {
+    pub fn new(port: u16) -> Self {
         Self {
             tcp_listener: None,
             port: port,
             decoder: None,
             running: false,
-            engine: Arc::new(Mutex::new(engine)),
+            app: None,
         }
+    }
+    pub fn set_app(&mut self, app: Weak<Mutex<dyn MatcherApp + Send>>) {
+        self.app = Some(app);
     }
 }
 impl AcceptorChannel for TcpAcceptorChannel {
@@ -47,13 +50,14 @@ impl AcceptorChannel for TcpAcceptorChannel {
         println!("Listening on {}", listener.local_addr()?);
 
         self.running = true;
-        let engine = self.engine.clone();
-        tokio::spawn(async move {
-            match Self::run_acceptor(listener, engine).await {
-                Ok(_) => println!("Acceptor stopped normally"),
-                Err(e) => eprintln!("Acceptor error: {}", e),
-            }
-        });
+        if let Some(app) = self.app.clone() {
+            tokio::spawn(async move {
+                match Self::run_acceptor(listener, app).await {
+                    Ok(_) => println!("Acceptor stopped normally"),
+                    Err(e) => eprintln!("Acceptor error: {}", e),
+                }
+            });
+        }
 
         Ok(())
     }
@@ -67,14 +71,14 @@ impl AcceptorChannel for TcpAcceptorChannel {
 impl TcpAcceptorChannel {
     async fn run_acceptor(
         listener: TcpListener,
-        engine: Arc<Mutex<MatchEngine>>,
+        app: Weak<Mutex<dyn MatcherApp>>,
     ) -> Result<(), Error> {
         loop {
             let (mut stream, addr) = listener.accept().await?;
             println!("Accepted connection from {:?}", addr);
-            let engine = engine.clone();
+            let app = app.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::handle_connection(stream, engine).await {
+                if let Err(e) = Self::handle_connection(stream, app).await {
                     eprintln!("Connection handler error: {}", e);
                 }
             });
@@ -83,7 +87,7 @@ impl TcpAcceptorChannel {
 
     async fn handle_connection(
         mut stream: TcpStream,
-        engine: Arc<Mutex<MatchEngine>>,
+        app: Weak<Mutex<dyn MatcherApp>>,
     ) -> Result<(), Error> {
         let mut decoder = FrameDecoder::new(SseDecoder);
         let mut buffer = [0u8; 1024];
@@ -116,9 +120,11 @@ impl TcpAcceptorChannel {
                             uid: order_request.uid,
                             security_id: order_request.security_id,
                         };
-                        {
-                            let mut engine = engine.lock().await;
-                            engine.match_order(&mut cmd);
+                        if let Some(app_arc) = app.upgrade() {
+                            let mut app = app_arc.lock().await;
+                            app.on_cmd(&mut cmd).await;
+                        } else {
+                            eprintln!("App has been dropped");
                         }
                         println!("Order received: {:?}", order);
                         print!("Order processed: {:?}", cmd)

@@ -1,14 +1,19 @@
-use exchange_matcher::engine::match_engine::MatchEngine;
-
-use exchange_matcher::interface::channel::{AcceptorChannel, TcpAcceptorChannel};
+use exchange_matcher::matcher_app::{DefaultMatcherApp, MatcherApp};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let engine = MatchEngine::new();
-    let mut acceptor = TcpAcceptorChannel::new(9010, engine);
-    acceptor.start().await?;
+    let app = DefaultMatcherApp::new(9010);
+    DefaultMatcherApp::init(app.clone()).await;
+    {
+        let mut app_guard = app.lock().await;
+        app_guard.start().await?;
+    }
+
     tokio::signal::ctrl_c().await?;
     println!("Received shutdown signal, gracefully shutting down...");
-    acceptor.stop().await?;
+    {
+        let mut app_guard = app.lock().await;
+        app_guard.stop().await?;
+    }
     Ok(())
 }

@@ -1,0 +1,30 @@
+[[apps]]
+name = "SSE-MATCHER"
+
+  [apps.engine]
+  type = "auto"
+  symbol = "SSE"
+
+  [[apps.channels]]
+  type = "market_data"
+  endpoint = "udp://0.0.0.0:9000"
+
+  [[apps.channels]]
+  type = "trading"
+  endpoint = "tcp://0.0.0.0:9001"
+
+
+[[apps]]
+name = "SZSE-MATCHER"
+
+  [apps.engine]
+  type = "auto"
+  symbol = "SZSE"
+
+  [[apps.channels]]
+  type = "market_data"
+  endpoint = "udp://0.0.0.0:9000"
+
+  [[apps.channels]]
+  type = "trading"
+  endpoint = "tcp://0.0.0.0:9001"
