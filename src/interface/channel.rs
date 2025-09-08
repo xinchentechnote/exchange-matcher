@@ -122,6 +122,7 @@ impl TcpAcceptorChannel {
                         };
                         if let Some(app_arc) = app.upgrade() {
                             let mut app = app_arc.lock().await;
+                            print!("Order will process: {:?}", cmd);
                             app.on_cmd(&mut cmd).await;
                         } else {
                             eprintln!("App has been dropped");

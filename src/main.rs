@@ -8,7 +8,7 @@ async fn main() -> anyhow::Result<()> {
         let mut app_guard = app.lock().await;
         app_guard.start().await?;
     }
-
+    print!("Matcher started");
     tokio::signal::ctrl_c().await?;
     println!("Received shutdown signal, gracefully shutting down...");
     {

@@ -74,6 +74,7 @@ impl MatcherApp for DefaultMatcherApp {
         let mut engine = self.engine.lock().await;
         println!("on_cmd:{:?}", &cmd);
         engine.match_order(cmd).await;
+        println!("on_cmd after:{:?}", &cmd);
     }
 
     fn on_match_event(&mut self, me: &MatchEvent) {
