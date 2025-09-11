@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use exchange_matcher::{
-    engine::match_engine::MatchEngine, event_router::EventRouter,
+    engine::match_engine::MatchEngine,
+    event_router::EventRouter,
     interface::channel::{AcceptorChannel, TcpAcceptorChannel},
 };
 use tokio::sync::Mutex;

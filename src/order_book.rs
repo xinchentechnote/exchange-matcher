@@ -181,7 +181,7 @@ impl OrderBook {
         } else {
             OrderStatus::PartCancel
         };
-        ev.volume = order.tvolume - order.volume; 
+        ev.volume = order.tvolume - order.volume;
         cmd.match_event_list.push(ev);
 
         CmdResultCode::Success
