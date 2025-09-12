@@ -16,7 +16,7 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
-    
+
     - name: Fix git@github.com to https://github.com
       run: |
         git config --global url."https://github.com/".insteadOf git@github.com:
