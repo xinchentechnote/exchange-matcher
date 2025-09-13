@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Rust (cargo run)",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin",
+                    "exchange-matcher"
+                ],
+                "filter": {
+                    "name": "exchange-matcher",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+            "sourceLanguages": [
+                "rust"
+            ]
+        }
+    ]
+}

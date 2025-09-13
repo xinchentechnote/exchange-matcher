@@ -5,7 +5,6 @@ use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 
 use crate::event_router::EventRouter;
 use crate::protocol::proto::FrameDecoder;
@@ -14,20 +13,20 @@ use crate::types::Order;
 use crate::types::RbCmd;
 
 pub trait AcceptorChannel {
-    async fn start(&mut self) -> Result<(), Error>;
-    async fn stop(&mut self) -> Result<(), Error>;
+    fn start(&mut self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+    fn stop(&mut self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
 pub struct TcpAcceptorChannel {
     tcp_listener: Option<TcpListener>,
     decoder: Option<FrameDecoder<SseDecoder>>,
-    router: Arc<Mutex<EventRouter>>,
+    router: Arc<EventRouter>,
     port: u16,
     running: bool,
 }
 
 impl TcpAcceptorChannel {
-    pub fn new(port: u16, router: Arc<Mutex<EventRouter>>) -> Self {
+    pub fn new(port: u16, router: Arc<EventRouter>) -> Self {
         Self {
             tcp_listener: None,
             port: port,
@@ -67,12 +66,9 @@ impl AcceptorChannel for TcpAcceptorChannel {
 }
 
 impl TcpAcceptorChannel {
-    async fn run_acceptor(
-        listener: TcpListener,
-        router: Arc<Mutex<EventRouter>>,
-    ) -> Result<(), Error> {
+    async fn run_acceptor(listener: TcpListener, router: Arc<EventRouter>) -> Result<(), Error> {
         loop {
-            let (mut stream, addr) = listener.accept().await?;
+            let (stream, addr) = listener.accept().await?;
             println!("Accepted connection from {:?}", addr);
             let router = router.clone();
             tokio::spawn(async move {
@@ -85,7 +81,7 @@ impl TcpAcceptorChannel {
 
     async fn handle_connection(
         mut stream: TcpStream,
-        router: Arc<Mutex<EventRouter>>,
+        router: Arc<EventRouter>,
     ) -> Result<(), Error> {
         let mut decoder = FrameDecoder::new(SseDecoder);
         let mut buffer = [0u8; 1024];
@@ -108,7 +104,7 @@ impl TcpAcceptorChannel {
                     }
                     SseBinaryBodyEnum::NewOrderSingle(order) => {
                         let order_request = Order::from(&order);
-                        let mut cmd = RbCmd {
+                        let cmd = RbCmd {
                             side: order_request.side,
                             match_event_list: vec![],
                             price: order_request.price,
@@ -118,11 +114,8 @@ impl TcpAcceptorChannel {
                             uid: order_request.uid,
                             security_id: order_request.security_id,
                         };
-                        print!("Order will process: {:?}", cmd);
-                        let mut r = router.lock().await;
-                        r.on_cmd(&mut cmd);
-                        println!("Order received: {:?}", order);
-                        print!("Order processed: {:?}", cmd)
+                        println!("Order will process: {:?}", cmd);
+                        router.on_cmd(cmd).await;
                     }
                     _ => {
                         println!("Unknown message type received");

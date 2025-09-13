@@ -125,3 +125,11 @@ pub struct RbCmd {
     pub oid: i64,
     pub security_id: String,
 }
+
+pub enum EngineCommand {
+    NewOrder(RbCmd),
+}
+
+pub enum EngineEvent {
+    MatchEvent(MatchEvent),
+}

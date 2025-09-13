@@ -1,38 +1,46 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use tokio::sync::Mutex;
-
-use crate::event_router::EventRouter;
 use crate::order_book::OrderBook;
-use crate::types::RbCmd;
+use crate::types::{EngineCommand, EngineEvent, RbCmd};
 
 pub struct MatchEngine {
     order_book_map: HashMap<String, OrderBook>,
-    router: Arc<Mutex<EventRouter>>,
+    cmd_rx: UnboundedReceiver<EngineCommand>,
+    event_tx: UnboundedSender<EngineEvent>,
 }
 
 impl MatchEngine {
-    pub fn new(router: Arc<Mutex<EventRouter>>) -> Self {
+    pub fn new(
+        cmd_rx: UnboundedReceiver<EngineCommand>,
+        event_tx: UnboundedSender<EngineEvent>,
+    ) -> Self {
         Self {
             order_book_map: HashMap::new(),
-            router: router,
+            cmd_rx,
+            event_tx,
         }
     }
-    pub fn get_order_book(&mut self, security_id: String) -> &mut OrderBook {
+    fn get_order_book(&mut self, security_id: String) -> &mut OrderBook {
         self.order_book_map
             .entry(security_id.to_string())
             .or_insert_with(|| OrderBook::new(security_id))
     }
 
-    pub async fn match_order(&mut self, cmd: &mut RbCmd) {
+    fn match_order(&mut self, cmd: &mut RbCmd) {
         let order_book = self.get_order_book(cmd.security_id.clone());
         order_book.new_order(cmd);
-        if cmd.match_event_list.len() > 0 {
-            let router = self.router.clone();
-            let mut router = router.lock().await;
-            for event in cmd.match_event_list.iter() {
-                router.on_match_event(event);
+        for event in cmd.match_event_list.iter() {
+            let _ = self.event_tx.send(EngineEvent::MatchEvent(event.clone()));
+        }
+    }
+
+    pub async fn start(&mut self) {
+        while let Some(cmd) = self.cmd_rx.recv().await {
+            match cmd {
+                EngineCommand::NewOrder(mut rb_cmd) => {
+                    self.match_order(&mut rb_cmd);
+                }
             }
         }
     }
