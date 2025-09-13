@@ -54,6 +54,7 @@ impl OrderBucketImpl {
 
         // current order match event (bidEvent)
         let bid_event = MatchEvent {
+            session_id: order.session_id,
             timestamp: now_ms,
             mid: cmd.mid,
             oid: cmd.oid,
@@ -70,6 +71,7 @@ impl OrderBucketImpl {
 
         // order match event (ofrEvent)
         let ofr_event = MatchEvent {
+            session_id: cmd.session_id,
             timestamp: now_ms,
             mid: order.mid,
             oid: order.oid,
@@ -198,6 +200,7 @@ mod tests {
         let mut bucket = OrderBucketImpl::new(45);
 
         bucket.put(Order {
+            session_id: 1,
             oid: 11,
             mid: 1,
             price: 45,
@@ -209,6 +212,7 @@ mod tests {
             timestamp: Utc::now().timestamp(),
         });
         bucket.put(Order {
+            session_id: 1,
             oid: 20,
             mid: 2,
             price: 45,
@@ -221,6 +225,7 @@ mod tests {
         });
 
         let mut cmd = RbCmd {
+            session_id: 1,
             security_id: "000001".to_string(),
             mid: 999,
             oid: 1000,

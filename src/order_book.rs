@@ -96,6 +96,7 @@ impl OrderBook {
         }
 
         let order = Order {
+            session_id: cmd.session_id,
             mid: cmd.mid,
             uid: cmd.uid,
             security_id: self.security_id.clone(),
@@ -136,6 +137,7 @@ impl OrderBook {
             .unwrap()
             .as_millis() as i64;
         let mut ev = MatchEvent::default();
+        ev.session_id = cmd.session_id;
         ev.timestamp = now;
         ev.mid = cmd.mid;
         ev.oid = cmd.oid;

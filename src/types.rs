@@ -73,6 +73,7 @@ pub enum OrderSide {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
+    pub session_id: u64,
     pub oid: i64,
     pub mid: i64,
     pub uid: u64,
@@ -92,6 +93,7 @@ impl Order {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchEvent {
+    pub session_id: u64,
     pub timestamp: i64,
     pub mid: i64,
     pub oid: i64,
@@ -103,6 +105,7 @@ pub struct MatchEvent {
 impl MatchEvent {
     pub fn default() -> MatchEvent {
         MatchEvent {
+            session_id: 0,
             timestamp: 0,
             mid: 0,
             oid: 0,
@@ -116,6 +119,7 @@ impl MatchEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RbCmd {
+    pub session_id: u64,
     pub side: OrderSide,
     pub match_event_list: Vec<MatchEvent>,
     pub price: i64,

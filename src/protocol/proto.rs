@@ -73,6 +73,7 @@ impl From<&NewOrderSingle> for Order {
         };
 
         Order {
+            session_id: 0,
             oid: order.cl_ord_id.parse::<i64>().unwrap(),
             security_id: order.security_id.clone(),
             side: side,
