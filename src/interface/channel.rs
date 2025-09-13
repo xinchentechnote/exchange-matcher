@@ -1,24 +1,32 @@
+use binary_codec::*;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
+use sse_binary::report::Report;
+use sse_binary::sse_binary::SseBinary;
 use sse_binary::sse_binary::SseBinaryBodyEnum;
 use std::io::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::net::tcp::OwnedWriteHalf;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::error;
 use tracing::info;
+use tracing::warn;
 
 use crate::protocol::proto::FrameDecoder;
 use crate::protocol::proto::SseDecoder;
 use crate::types::EngineCommand;
 use crate::types::EngineEvent;
 use crate::types::Order;
+use crate::types::OrderStatus;
 use crate::types::RbCmd;
 
 pub trait AcceptorChannel {
@@ -31,7 +39,7 @@ pub trait AcceptorChannel {
 
 struct Session {
     id: u64,
-    writer: OwnedWriteHalf,
+    writer: Arc<Mutex<OwnedWriteHalf>>,
     tx: UnboundedSender<EngineEvent>,
 }
 
@@ -126,12 +134,15 @@ impl TcpAcceptorChannel {
         let session_id = self.next_id();
         let session = Session {
             id: session_id,
-            writer: writer,
+            writer: Arc::new(Mutex::new(writer)),
             tx: tx,
         };
         self.session_map.insert(session_id, session);
         let mut decoder = FrameDecoder::new(SseDecoder);
         let mut buffer = [0u8; 1024];
+
+        let cmd_tx = self.cmd_tx.clone();
+        let session_map = self.session_map.clone();
         tokio::spawn(async move {
             let mut reader = BufReader::new(reader);
             loop {
@@ -142,6 +153,7 @@ impl TcpAcceptorChannel {
                 }
 
                 decoder.feed(&buffer[..n]);
+                // process rev messages
                 while let Some(msg) = decoder.next_frame() {
                     match msg.body {
                         SseBinaryBodyEnum::Logon(logon) => {
@@ -164,7 +176,7 @@ impl TcpAcceptorChannel {
                                 security_id: order_request.security_id,
                             };
                             info!("Order will process: {:?}", cmd);
-                            let _ = self.cmd_tx.send(EngineCommand::NewOrder(cmd));
+                            let _ = cmd_tx.send(EngineCommand::NewOrder(cmd));
                         }
                         _ => {
                             info!("Unknown message type received");
@@ -173,11 +185,56 @@ impl TcpAcceptorChannel {
                 }
             }
         });
+
         tokio::spawn(async move {
+            // process events, convert to report and send to client
             while let Some(event) = rx.recv().await {
                 match event {
                     EngineEvent::MatchEvent(me) => {
                         info!("Sending Match Event to client {}: {:?}", addr, me);
+                        match me.status {
+                            OrderStatus::OrderEd
+                            | OrderStatus::CancelEd
+                            | OrderStatus::PartCancel => {
+                                //Confirm
+                            }
+                            //
+                            OrderStatus::PartTrade | OrderStatus::TradeEd => {
+                                //report
+                                let report = SseBinaryBodyEnum::Report(Report::from(&me));
+                                let sse_binary = SseBinary {
+                                    msg_type: 103,
+                                    msg_seq_num: 1,
+                                    msg_body_len: 0,
+                                    body: report,
+                                    checksum: 0,
+                                };
+                                let mut buf = BytesMut::new();
+                                sse_binary.encode(&mut buf);
+                                if let Some(session_ref) = session_map.get(&me.session_id) {
+                                    let mut w = session_ref.writer.lock().await;
+                                    info!(
+                                        "Writing to client {}: {:?}",
+                                        me.session_id, &buf[..]
+                                    );
+                                    if let Err(e) = w.write_all(&buf).await {
+                                        error!(
+                                            "Failed to write to client {}: {}",
+                                            me.session_id, e
+                                        );
+                                    }
+                                    w.flush().await;
+                                } else {
+                                    info!(
+                                        "Session {} not found, maybe disconnected",
+                                        me.session_id
+                                    );
+                                }
+                            }
+                            _ => {
+                                warn!("Unknown order status: {:?}", me.status);
+                            }
+                        }
                     }
                 }
             }
