@@ -7,6 +7,8 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::error;
+use tracing::info;
 
 use crate::interface::channel;
 use crate::protocol::proto::FrameDecoder;
@@ -48,7 +50,7 @@ impl AcceptorChannel for TcpAcceptorChannel {
         }
 
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
-        println!("Listening on {}", listener.local_addr()?);
+        info!("Listening on {}", listener.local_addr()?);
 
         let channel = Arc::new(self.clone());
         self.running = true;
@@ -56,8 +58,8 @@ impl AcceptorChannel for TcpAcceptorChannel {
         let c = channel.clone();
         tokio::spawn(async move {
             match c.run_acceptor(listener).await {
-                Ok(_) => println!("Acceptor stopped normally"),
-                Err(e) => eprintln!("Acceptor error: {}", e),
+                Ok(_) => info!("Acceptor stopped normally"),
+                Err(e) => error!("Acceptor error: {}", e),
             }
         });
 
@@ -66,7 +68,7 @@ impl AcceptorChannel for TcpAcceptorChannel {
             while let Some(event) = event_rx.recv().await {
                 match event {
                     EngineEvent::MatchEvent(me) => {
-                        println!("Match Event: {:?}", me);
+                        info!("Match Event: {:?}", me);
                     }
                 }
             }
@@ -86,10 +88,10 @@ impl TcpAcceptorChannel {
         loop {
             let (stream, addr) = listener.accept().await?;
             let channel = self.clone();
-            println!("Accepted connection from {:?}", addr);
+            info!("Accepted connection from {:?}", addr);
             tokio::spawn(async move {
                 if let Err(e) = channel.handle_connection(stream).await {
-                    eprintln!("Connection handler error: {}", e);
+                    error!("Connection handler error: {}", e);
                 }
             });
         }
@@ -102,7 +104,7 @@ impl TcpAcceptorChannel {
         loop {
             let n = stream.read(&mut buffer).await?;
             if n == 0 {
-                println!("Client disconnected");
+                info!("Client disconnected");
                 return Ok(());
             }
 
@@ -110,10 +112,10 @@ impl TcpAcceptorChannel {
             while let Some(msg) = decoder.next_frame() {
                 match msg.body {
                     SseBinaryBodyEnum::Logon(logon) => {
-                        println!("Logon received: {:?}", logon);
+                        info!("Logon received: {:?}", logon);
                     }
                     SseBinaryBodyEnum::Heartbeat(_) => {
-                        println!("Heartbeat received");
+                        info!("Heartbeat received");
                     }
                     SseBinaryBodyEnum::NewOrderSingle(order) => {
                         let order_request = Order::from(&order);
@@ -127,11 +129,11 @@ impl TcpAcceptorChannel {
                             uid: order_request.uid,
                             security_id: order_request.security_id,
                         };
-                        println!("Order will process: {:?}", cmd);
+                        info!("Order will process: {:?}", cmd);
                         self.cmd_tx.send(EngineCommand::NewOrder(cmd));
                     }
                     _ => {
-                        println!("Unknown message type received");
+                        info!("Unknown message type received");
                     }
                 }
             }
