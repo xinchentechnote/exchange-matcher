@@ -213,10 +213,7 @@ impl TcpAcceptorChannel {
                                 sse_binary.encode(&mut buf);
                                 if let Some(session_ref) = session_map.get(&me.session_id) {
                                     let mut w = session_ref.writer.lock().await;
-                                    info!(
-                                        "Writing to client {}: {:?}",
-                                        me.session_id, &buf[..]
-                                    );
+                                    info!("Writing to client {}: {:?}", me.session_id, &buf[..]);
                                     if let Err(e) = w.write_all(&buf).await {
                                         error!(
                                             "Failed to write to client {}: {}",
