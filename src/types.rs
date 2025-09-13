@@ -126,10 +126,12 @@ pub struct RbCmd {
     pub security_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineCommand {
     NewOrder(RbCmd),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineEvent {
     MatchEvent(MatchEvent),
 }

@@ -1,5 +1,4 @@
 pub mod engine;
-pub mod event_router;
 pub mod interface;
 pub mod matcher_app;
 pub mod order_book;

@@ -5,40 +5,44 @@ use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
+use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::UnboundedSender;
 
-use crate::event_router::EventRouter;
+use crate::interface::channel;
 use crate::protocol::proto::FrameDecoder;
 use crate::protocol::proto::SseDecoder;
+use crate::types::EngineCommand;
+use crate::types::EngineEvent;
 use crate::types::Order;
 use crate::types::RbCmd;
 
 pub trait AcceptorChannel {
-    fn start(&mut self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+    fn start(
+        &mut self,
+        event_rx: UnboundedReceiver<EngineEvent>,
+    ) -> impl std::future::Future<Output = Result<(), Error>> + Send;
     fn stop(&mut self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
+#[derive(Clone)]
 pub struct TcpAcceptorChannel {
-    tcp_listener: Option<TcpListener>,
-    decoder: Option<FrameDecoder<SseDecoder>>,
-    router: Arc<EventRouter>,
     port: u16,
     running: bool,
+    cmd_tx: UnboundedSender<EngineCommand>,
 }
 
 impl TcpAcceptorChannel {
-    pub fn new(port: u16, router: Arc<EventRouter>) -> Self {
+    pub fn new(port: u16, cmd_tx: UnboundedSender<EngineCommand>) -> Self {
         Self {
-            tcp_listener: None,
             port: port,
-            decoder: None,
             running: false,
-            router,
+            cmd_tx,
         }
     }
 }
 
 impl AcceptorChannel for TcpAcceptorChannel {
-    async fn start(&mut self) -> Result<(), Error> {
+    async fn start(&mut self, mut event_rx: UnboundedReceiver<EngineEvent>) -> Result<(), Error> {
         if self.running {
             return Err(Error::new(ErrorKind::Other, "Acceptor already running"));
         }
@@ -46,15 +50,27 @@ impl AcceptorChannel for TcpAcceptorChannel {
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.port)).await?;
         println!("Listening on {}", listener.local_addr()?);
 
+        let channel = Arc::new(self.clone());
         self.running = true;
-        if let router = self.router.clone() {
-            tokio::spawn(async move {
-                match Self::run_acceptor(listener, router).await {
-                    Ok(_) => println!("Acceptor stopped normally"),
-                    Err(e) => eprintln!("Acceptor error: {}", e),
+
+        let c = channel.clone();
+        tokio::spawn(async move {
+            match c.run_acceptor(listener).await {
+                Ok(_) => println!("Acceptor stopped normally"),
+                Err(e) => eprintln!("Acceptor error: {}", e),
+            }
+        });
+
+        tokio::spawn(async move {
+            //self.event_rx
+            while let Some(event) = event_rx.recv().await {
+                match event {
+                    EngineEvent::MatchEvent(me) => {
+                        println!("Match Event: {:?}", me);
+                    }
                 }
-            });
-        }
+            }
+        });
 
         Ok(())
     }
@@ -66,23 +82,20 @@ impl AcceptorChannel for TcpAcceptorChannel {
 }
 
 impl TcpAcceptorChannel {
-    async fn run_acceptor(listener: TcpListener, router: Arc<EventRouter>) -> Result<(), Error> {
+    async fn run_acceptor(self: Arc<Self>, listener: TcpListener) -> Result<(), Error> {
         loop {
             let (stream, addr) = listener.accept().await?;
+            let channel = self.clone();
             println!("Accepted connection from {:?}", addr);
-            let router = router.clone();
             tokio::spawn(async move {
-                if let Err(e) = Self::handle_connection(stream, router).await {
+                if let Err(e) = channel.handle_connection(stream).await {
                     eprintln!("Connection handler error: {}", e);
                 }
             });
         }
     }
 
-    async fn handle_connection(
-        mut stream: TcpStream,
-        router: Arc<EventRouter>,
-    ) -> Result<(), Error> {
+    async fn handle_connection(self: Arc<Self>, mut stream: TcpStream) -> Result<(), Error> {
         let mut decoder = FrameDecoder::new(SseDecoder);
         let mut buffer = [0u8; 1024];
 
@@ -115,7 +128,7 @@ impl TcpAcceptorChannel {
                             security_id: order_request.security_id,
                         };
                         println!("Order will process: {:?}", cmd);
-                        router.on_cmd(cmd).await;
+                        self.cmd_tx.send(EngineCommand::NewOrder(cmd));
                     }
                     _ => {
                         println!("Unknown message type received");
