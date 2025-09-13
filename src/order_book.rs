@@ -91,6 +91,7 @@ impl OrderBook {
         }
 
         if t_volume == cmd.volume {
+            //全部成交
             return CmdResultCode::Success;
         }
 
@@ -107,11 +108,10 @@ impl OrderBook {
         };
 
         if t_volume == 0 {
+            //委托确认
             self.gen_match_event(cmd, OrderStatus::OrderEd);
-        } else {
-            self.gen_match_event(cmd, OrderStatus::PartTrade);
         }
-
+        //增加到订单簿
         if cmd.side == OrderSide::Sell {
             let bucket = self
                 .sell_buckets

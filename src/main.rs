@@ -8,7 +8,7 @@ use exchange_matcher::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (cmd_tx, cmd_rx) =tokio::sync::mpsc::unbounded_channel();
     let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
 
     let router = Arc::new(EventRouter::new(cmd_tx.clone()));
